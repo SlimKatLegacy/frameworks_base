@@ -2749,6 +2749,12 @@ public final class Settings {
         public static final String DESK_UNDOCK_SOUND = Global.DESK_UNDOCK_SOUND;
 
         /**
+         * Toggle to let trackball wake the screen.
+         * @hide
+         */
+        public static final String TRACKBALL_WAKE_SCREEN = "trackball_wake_screen";
+
+        /**
          * @deprecated Use {@link android.provider.Settings.Global#CAR_DOCK_SOUND}
          * instead
          * @hide
