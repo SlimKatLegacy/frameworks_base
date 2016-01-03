@@ -135,7 +135,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     static final boolean DEBUG = false;
     static final boolean localLOGV = false;
     static final boolean DEBUG_LAYOUT = false;
-    static final boolean DEBUG_INPUT = false;
+    static final boolean DEBUG_INPUT = true;
     static final boolean DEBUG_STARTING_WINDOW = false;
     static final boolean SHOW_STARTING_ANIMATIONS = true;
     static final boolean SHOW_PROCESSES_ON_ALT_MENU = false;
@@ -696,9 +696,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     Settings.System.HARDWARE_KEY_REBINDING), false, this,
                     UserHandle.USER_ALL);
             resolver.registerContentObserver(Settings.System.getUriFor(
-		    Settings.System.TRACKBALL_WAKE_SCREEN), false, this,
-		    UserHandle.USER_ALL);
-            updateKeyAssignments();
+		    Settings.System.TRACKBALL_WAKE_SCREEN), false, this);
+            updateSettings();
         }
 
         @Override
@@ -1418,14 +1417,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 updateOrientationListenerLp();
             }
 
-            mTrackballWakeScreen = (Settings.System.getInt(resolver,
-                    Settings.System.TRACKBALL_WAKE_SCREEN, 1) == 1);
+            mTrackballWakeScreen = Settings.System.getInt(resolver, Settings.System.TRACKBALL_WAKE_SCREEN, 1) != 0;
 
             mVolumeWakeScreen = Settings.System.getIntForUser(resolver,
                     Settings.System.VOLUME_WAKE_SCREEN, 0, UserHandle.USER_CURRENT) != 0;
 
             mVolumeMusicControls = Settings.System.getIntForUser(resolver,
                     Settings.System.VOLUME_MUSIC_CONTROLS, 1, UserHandle.USER_CURRENT) != 0;
+
+            updateKeyAssignments();
 
             mNavigationBarCanMove = mShortSizeDp < 600 ?
                     Settings.System.getIntForUser(mContext.getContentResolver(),
@@ -4548,9 +4548,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             && (keyCode == KeyEvent.KEYCODE_VOLUME_UP
             || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN);
 
+        final boolean isTrackballWakeKey = !isScreenOn
+            && mTrackballWakeScreen
+            && !isOffByProx;
+
         final boolean isWakeKey = (policyFlags
             & (WindowManagerPolicy.FLAG_WAKE | WindowManagerPolicy.FLAG_WAKE_DROPPED)) != 0
-            || isVolumeWakeKey;
+            || isVolumeWakeKey || isTrackballWakeKey;
 
         if (DEBUG_INPUT) {
             Log.d(TAG, "interceptKeyTq keycode=" + keyCode
@@ -4725,7 +4729,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         }
                     }
                 }
-                if (isScreenOn || !mVolumeWakeScreen) {
+                if (isScreenOn || !mVolumeWakeScreen || !mTrackballWakeScreen) {
                     break;
                 } else if (keyguardActive) {
                     keyCode = KeyEvent.KEYCODE_POWER;
@@ -4895,6 +4899,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         final int policyflag = (policyFlags
                 & (WindowManagerPolicy.FLAG_WAKE | WindowManagerPolicy.FLAG_WAKE_DROPPED));
+        if (DEBUG_INPUT) {
+            Log.d(TAG, "interceptMotionBeforeQueueingWhenScreenOff policyflag=" + policyflag + " mTrackballWakeScreen=" + mTrackballWakeScreen);
+        }
         final boolean isWakeMotion = ((policyflag != 0) && (policyflag != 3))
         // mouse events will produce a 1 (WAKE) or 2 (WAKE_DROPPED) but never 3,
         // so we can assign 3 as a special value for the trackball motion events
@@ -4902,8 +4909,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         // This is really wrong but seems to work without effecting external
         // devices ability to wake the device.
             || ((policyflag == 3) && mTrackballWakeScreen);
-
-
         if (isWakeMotion) {
             result |= ACTION_WAKE_UP;
         }
